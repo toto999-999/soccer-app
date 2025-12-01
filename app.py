@@ -256,8 +256,11 @@ def train_models_func(df):
     scaler = StandardScaler()
     X_scaled = pd.DataFrame(scaler.fit_transform(X), columns=features, index=X.index)
     
-    model = XGBClassifier(n_estimators=500, learning_rate=0.02, max_depth=5, 
-                          use_label_encoder=False, eval_metric='mlogloss', n_jobs=-1, random_state=42)
+    # [수정] AI 모델 경량화 (서버 과부하 방지)
+    # n_estimators: 500 -> 50 (나무 개수를 1/10로 줄임)
+    # max_depth: 5 -> 3 (생각의 깊이를 얕게 함)
+    model = XGBClassifier(n_estimators=50, learning_rate=0.05, max_depth=3, 
+                          use_label_encoder=False, eval_metric='mlogloss', n_jobs=1, random_state=42)
     model.fit(X_scaled, y_enc)
     
     hg_model, ag_model = None, None
@@ -265,8 +268,9 @@ def train_models_func(df):
         valid = train.dropna(subset=['홈팀득점', '원정팀득점'])
         if len(valid) >= 20:
             X_s = X_scaled.loc[valid.index]
-            hg_model = RandomForestRegressor(n_estimators=200, random_state=42).fit(X_s, valid['홈팀득점'])
-            ag_model = RandomForestRegressor(n_estimators=200, random_state=42).fit(X_s, valid['원정팀득점'])
+            # [수정] 스코어 예측 모델도 경량화
+            hg_model = RandomForestRegressor(n_estimators=50, max_depth=3, n_jobs=1, random_state=42).fit(X_s, valid['홈팀득점'])
+            ag_model = RandomForestRegressor(n_estimators=50, max_depth=3, n_jobs=1, random_state=42).fit(X_s, valid['원정팀득점'])
     except: pass
     
     return model, le, hg_model, ag_model, features, scaler
@@ -448,4 +452,5 @@ def main():
                         st.warning(f"{row['Home']} vs {row['Away']} -> 승 (EV {ev_win:.2f})")
 
 if __name__ == '__main__':
+
     main()
